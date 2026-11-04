@@ -1,24 +1,19 @@
-// src/js/pixabay-api.js - Pixabay API module for image search
 import axios from 'axios';
 
-export async function getImagesByQuery(query, page) {
-  const API_KEY = 'YOUR_API_KEY'; // Замените на ваш ключ API, не храните его в репозитории
+const API_KEY = import.meta.env.VITE_PIXABAY_API_KEY;
 
-  try {
-    const response = await axios.get('https://pixabay.com/api/', {
-      params: {
-        key: API_KEY,
-        q: query,
-        image_type: 'photo',
-        orientation: 'horizontal',
-        safesearch: true,
-        page: page,
-        per_page: 15,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching images:', error);
-    throw error;
-  }
+export async function getImagesByQuery(query, page) {
+  if (!API_KEY) throw new Error('Set VITE_PIXABAY_API_KEY in .env');
+  const { data } = await axios.get('https://pixabay.com/api/', {
+    params: {
+      key: API_KEY,
+      q: query,
+      image_type: 'photo',
+      orientation: 'horizontal',
+      safesearch: true,
+      page,
+      per_page: 15,
+    },
+  });
+  return data;
 }
