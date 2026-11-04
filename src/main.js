@@ -1,132 +1,86 @@
-// src/main.js - Main application logic
+import iziToast from 'izitoast';
+import 'izitoast/dist/css/iziToast.min.css';
 import { getImagesByQuery } from './js/pixabay-api.js';
 import {
-  createGallery,
-  clearGallery,
-  showLoader,
-  hideLoader,
-  showLoadMoreButton,
-  hideLoadMoreButton,
+  createGallery, clearGallery, showLoader, hideLoader,
+  showLoadMoreButton, hideLoadMoreButton,
 } from './js/render-functions.js';
 
-import iziToast from 'izitoast';
-import SimpleLightbox from 'simplelightbox';
-
-const searchForm = document.querySelector('.search-form');
-const searchInput = document.querySelector('.search-input');
+const form = document.querySelector('.search-form');
+const input = document.querySelector('.search-input');
 const gallery = document.querySelector('.gallery');
-const loadMoreBtn = document.querySelector('.load-more');
-const loader = document.querySelector('.loader');
-
+const moreButton = document.querySelector('.load-more');
+const END_MESSAGE = "We're sorry, but you've reached the end of search results.";
+const PAGE_SIZE = 15;
 let query = '';
 let page = 1;
 let totalHits = 0;
-let imagesLoaded = 0;
+let loaded = 0;
+let loading = false;
 
-const lightbox = new SimpleLightbox('.gallery a', {
-  captionsData: 'alt',
-  captionDelay: 250,
-});
+function hasMore() {
+  return loaded < Math.min(totalHits, 500);
+}
 
-iziToast.settings({
-  position: 'topRight',
-  timeout: 3000,
-  close: true,
-  closeOnClick: true,
-  pauseOnHover: true,
-  progressBar: true,
-  transitionIn: 'fadeInLeft',
-  transitionOut: 'fadeOutRight',
-});
+function updateButton() {
+  if (hasMore()) showLoadMoreButton();
+  else {
+    hideLoadMoreButton();
+    if (loaded > 0) iziToast.info({ message: END_MESSAGE });
+  }
+}
 
-searchForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function fetchImages(nextPage, append) {
+  if (loading) return;
+  loading = true;
+  hideLoadMoreButton();
+  showLoader();
+  try {
+    const data = await getImagesByQuery(query, nextPage);
+    if (!data.hits.length) {
+      if (!append) iziToast.warning({
+        message: 'Sorry, there are no images matching your search query. Please try again!',
+      });
+      else iziToast.info({ message: END_MESSAGE });
+      return;
+    }
+    createGallery(data.hits);
+    totalHits = data.totalHits;
+    loaded += data.hits.length;
+    page = nextPage;
+    updateButton();
 
-  query = searchInput.value.trim();
+    if (append && gallery.firstElementChild) {
+      const { height: cardHeight } = gallery.firstElementChild.getBoundingClientRect();
+      window.scrollBy({ top: cardHeight * 2, behavior: 'smooth' });
+    }
+  } catch {
+    iziToast.error({ message: 'Failed to load images. Please try again.' });
+    if (append && hasMore()) showLoadMoreButton();
+  } finally {
+    loading = false;
+    hideLoader();
+  }
+}
 
-  if (!query) {
-    iziToast.error({
-      title: 'Помилка',
-      message: 'Будь ласка, введіть пошуковий запит',
-    });
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (loading) return;
+  const value = input.value.trim();
+  if (!value) {
+    iziToast.warning({ message: 'Please enter a search query.' });
     return;
   }
-
+  query = value;
   page = 1;
+  totalHits = 0;
+  loaded = 0;
   clearGallery();
   hideLoadMoreButton();
-  showLoader();
-
-  try {
-    const data = await getImagesByQuery(query, page);
-
-    if (data.hits.length === 0) {
-      iziToast.warning({
-        title: 'Увага',
-        message: 'Зображення за цим запитом не знайдені',
-      });
-    } else {
-      totalHits = data.totalHits;
-      imagesLoaded = 0;
-      createGallery(data.hits);
-      imagesLoaded = data.hits.length;
-
-      if (data.hits.length < 15) {
-        hideLoadMoreButton();
-        iziToast.info({
-          title: 'Повідомлення',
-          message: "Ми засмучені, але you've reached the end of search results.",
-        });
-      } else {
-        showLoadMoreButton();
-      }
-    }
-  } catch (error) {
-    iziToast.error({
-      title: 'Помилка',
-      message: 'Сталася помилка при пошуку зображень',
-    });
-    console.error(error);
-  } finally {
-    hideLoader();
-  }
+  await fetchImages(1, false);
 });
 
-loadMoreBtn.addEventListener('click', async () => {
-  hideLoadMoreButton();
-  showLoader();
-
-  page += 1;
-
-  try {
-    const data = await getImagesByQuery(query, page);
-    createGallery(data.hits);
-
-    const { height: cardHeight } = gallery.firstElementChild.getBoundingClientRect();
-    window.scrollBy({
-      top: cardHeight * 2,
-      behavior: 'smooth',
-    });
-
-    if (data.hits.length < 15 || page * 15 >= totalHits) {
-      hideLoadMoreButton();
-      iziToast.info({
-        title: 'Повідомлення',
-        message: "Ми засмучені, але you've reached the end of search results.",
-      });
-    } else {
-      showLoadMoreButton();
-    }
-  } catch (error) {
-    iziToast.error({
-      title: 'Помилка',
-      message: 'Сталася помилка при завантаженні додаткових зображень',
-    });
-    console.error(error);
-  } finally {
-    hideLoader();
-  }
+moreButton.addEventListener('click', async () => {
+  if (loading || !query || !hasMore()) return;
+  await fetchImages(page + 1, true);
 });
-
-// Handle escape key for lightbox
-export { lightbox, showLoader, hideLoader, showLoadMoreButton, hideLoadMoreButton };
