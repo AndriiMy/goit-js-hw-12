@@ -29,15 +29,17 @@ export function createGallery(images) {
       </div>
     </li>
   `).join('');
+  if (!gallery) return;
   gallery.insertAdjacentHTML('beforeend', markup);
   lightbox.refresh();
 }
 
 export function clearGallery() {
+  if (!gallery) return;
   gallery.innerHTML = '';
   lightbox.refresh();
 }
-export function showLoader() { loader.classList.remove('hidden'); }
-export function hideLoader() { loader.classList.add('hidden'); }
-export function showLoadMoreButton() { loadMoreButton.classList.remove('hidden'); }
-export function hideLoadMoreButton() { loadMoreButton.classList.add('hidden'); }
+export function showLoader() { loader?.classList.remove('hidden'); }
+export function hideLoader() { loader?.classList.add('hidden'); }
+export function showLoadMoreButton() { loadMoreButton?.classList.remove('hidden'); }
+export function hideLoadMoreButton() { loadMoreButton?.classList.add('hidden'); }
